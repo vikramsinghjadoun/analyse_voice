@@ -32,6 +32,12 @@ module.exports = {
           '50%': { transform: 'translateY(-20px)' },
         }
       },
+      backdropBlur: {
+        'xs': '2px',
+      },
+      backgroundColor: {
+        'glass': 'rgba(255, 255, 255, 0.1)',
+      },
       boxShadow: {
         'brutal': '5px 5px 0px 0px rgba(0,0,0,1)',
         'brutal-2': '8px 8px 0px 0px rgba(0,0,0,1)',

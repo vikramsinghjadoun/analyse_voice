@@ -1,25 +1,21 @@
-
-from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-import whisper
-import numpy as np
-#import soundfile as sf
-import io
+from fastapi import FastAPI, File, UploadFile, Form
 from pydub import AudioSegment
-import uvicorn
+import whisper
 import tempfile
 import numpy as np
-
+import re
+import uvicorn
+from fastapi.middleware.cors import CORSMiddleware
 app = FastAPI()
-# Configure CORS
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Allow frontend origin
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],  # Allow all HTTP methods (GET, POST, etc.)
-    allow_headers=["*"],  # Allow all headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
+
 model = whisper.load_model("base")
 
 def convert_to_wav(file: UploadFile):
@@ -36,15 +32,42 @@ def analyze_noise(audio_path: str):
     noise_level = rms / max_rms
     return noise_level
 
+def extract_numbers(text: str):
+    return re.findall(r'\d+', text)
+
 @app.post("/analyze")
-async def analyze_audio(file: UploadFile = File(...)):
+async def analyze_audio(file: UploadFile = File(...), text: str = Form(...)):
     wav_path = convert_to_wav(file)
     result = model.transcribe(wav_path)
     transcription = result["text"]
     noise_level = analyze_noise(wav_path)
     is_noisy = noise_level > 0.5  
+
+    if is_noisy:
+        return {
+            "transcription": transcription,
+            "noise_level": float(noise_level),  
+            "is_noisy": bool(is_noisy),  
+            "quality_assessment": "Noisy",
+            "result": "Audio is noisy. Please go to a quieter environment and record again."
+        }
+
+    expected_numbers = extract_numbers(text)
+    transcribed_numbers = extract_numbers(transcription)
+
+    if expected_numbers != transcribed_numbers:
+        return {
+            "transcription": transcription,
+            "noise_level": float(noise_level),  
+            "is_noisy": bool(is_noisy),  
+            "quality_assessment": "Good",
+            "result": "voice liveness failed."
+        }
+
     return {
         "transcription": transcription,
         "noise_level": float(noise_level),  
         "is_noisy": bool(is_noisy),  
+        "quality_assessment": "Good",
+        "result": "You are cleared. No noise detected. You pass."
     }
